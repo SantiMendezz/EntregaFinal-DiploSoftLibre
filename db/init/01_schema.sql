@@ -1,0 +1,27 @@
+USE `laboratorio-db`;
+
+CREATE TABLE IF NOT EXISTS `users` (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  phone VARCHAR(30),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `turnos` (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  duration_minutes INT DEFAULT 30,
+  service VARCHAR(150),
+  status ENUM('scheduled','completed','cancelled','no_show') DEFAULT 'scheduled',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_user_id (user_id),
+  INDEX idx_scheduled_at (scheduled_at),
+  CONSTRAINT fk_turnos_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
