@@ -4,13 +4,67 @@ const express = require("express");
 const mysql = require("mysql2/promise");
 const { fetchWeatherApi } = require("openmeteo");
 
-//Configuracion de la conexion a la base de datos
-const pool = mysql.createPool({
-  host: "db",
-  user: "root",
-  password: "1234",
-  database: "laboratorio",
-});
+const fs = require('fs'); // Maneja archivos, eliminar, sobreescribir, etc
+const path = require('path'); //Se encarga de manejar correctamente las rutas
+
+// Configuración de la conexión a la base de datos (se inicializa más abajo)
+let pool;
+
+async function initDatabase() {
+  // Leer configuración desde variables de entorno (soporta docker-compose env)
+  const dbHost = process.env.DB_HOST || 'db';
+  const dbUser = process.env.DB_USER || 'root';
+  const dbPassword = process.env.DB_PASSWORD || '1234';
+  const dbName = process.env.DB_NAME || 'laboratorio';
+
+  // Conectar sin nombre de base para crearla si hace falta.
+  // MariaDB dentro de Docker puede tardar en estar lista, así que intentamos varias veces.
+  const maxAttempts = 12;
+  const retryDelayMs = 2000;
+  let initConn;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      initConn = await mysql.createConnection({
+        host: dbHost,
+        user: dbUser,
+        password: dbPassword,
+        multipleStatements: true
+      });
+      break;
+    } catch (err) {
+      console.log(`DB connection attempt ${attempt} failed: ${err.message}`);
+      if (attempt === maxAttempts) throw err;
+      await new Promise(r => setTimeout(r, retryDelayMs));
+    }
+  }
+
+  // Crear la base de datos si no existe
+  await initConn.query('CREATE DATABASE IF NOT EXISTS laboratorio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;');
+
+  // Intentar cargar el esquema inicial desde el archivo init/01_schema.sql si existe
+  const schemaPath = path.join(__dirname, '..', 'init', '01_schema.sql');
+  try {
+    if (fs.existsSync(schemaPath)) {
+      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+      // Usar la BD y ejecutar el SQL del esquema
+      await initConn.query('USE laboratorio; ' + schemaSql);
+    }
+  } catch (err) {
+    console.warn('No se pudo ejecutar el esquema inicial:', err.message);
+  }
+
+  await initConn.end();
+
+  // Crear el pool apuntando a la base de datos ya creada
+  pool = mysql.createPool({
+    host: dbHost,
+    user: dbUser,
+    password: dbPassword,
+    database: dbName,
+    waitForConnections: true,
+    connectionLimit: 10
+  });
+}
 
 //Configuracion del servidor Express
 const app = express();
@@ -29,49 +83,133 @@ app.get("/api/status", (req, res) => {
 });
 
 //Usuarios
-app.get("/api/usuarios", async (req, res) => {
-  const [rows] = await pool.query("SELECT * FROM usuarios");
+app.get("/api/users", async (req, res) => {
+  const [rows] = await pool.query("SELECT * FROM users");
   res.json(rows);
 });
 
-app.post("/api/usuarios", async (req, res) => {
-  const { nombre } = req.body;
-  const [result] = await pool.query("INSERT INTO usuarios (nombre) VALUES (?)", [
-    nombre,
+app.post("/api/users", async (req, res) => {
+  const { name } = req.body;
+  const [result] = await pool.query("INSERT INTO users (name) VALUES (?)", [
+    name,
   ]);
-  res.json({ id: result.insertId, nombre });
+  res.json({ id: result.insertId, name });
+});
+
+app.put("/api/users/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone } = req.body;
+  await pool.query("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?", [
+    name,
+    email,
+    phone,
+    id
+  ]);
+  res.json({ id, name, email, phone });
+});
+
+app.delete("/api/users/:id", async (req, res) => {
+  const { id } = req.params;
+  await pool.query("DELETE FROM users WHERE id = ?", [id]);
+  res.json({ message: "User eliminado" });
+});
+
+//Professionals
+app.get("/api/professionals", async (req, res) => {
+  const [rows] = await pool.query("SELECT * FROM professional");
+  res.json(rows);
+});
+
+app.post("/api/professionals", async (req, res) => {
+  const { name, email, phone, speciality } = req.body;
+  const [result] = await pool.query("INSERT INTO professional (name, email, phone, speciality) VALUES (?, ?, ?, ?)", [
+    name,
+    email,
+    phone,
+    speciality
+  ]);
+  res.json({ id: result.insertId, name, email, phone, speciality });
+});
+
+app.put("/api/professionals/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, speciality } = req.body;
+  await pool.query("UPDATE professional SET name = ?, email = ?, phone = ?, speciality = ? WHERE id = ?", [
+    name,
+    email,
+    phone,
+    speciality,
+    id
+  ]);
+  res.json({ id, name, email, phone, speciality });
+});
+
+app.delete("/api/professionals/:id", async (req, res) => {
+  const { id } = req.params;
+  await pool.query("DELETE FROM professional WHERE id = ?", [id]);
+  res.json({ message: "Professional eliminado" });
 });
 
 //Turnos
-app.get("/api/turnos", async (req, res) => {
-  const [rows] = await pool.query("SELECT * FROM turnos");
+app.get("/api/appointments", async (req, res) => {
+  const [rows] = await pool.query("SELECT * FROM appointments");
   res.json(rows);
 });
 
-app.post("/api/turnos", async (req, res) => {
-  const { fecha, usuario_id } = req.body;
+app.post("/api/appointments", async (req, res) => {
+  const { scheduled_at, service, notes, user_id, professional_id } = req.body;
+  if (user_id != null) {
+    const [users] = await pool.query("SELECT id FROM users WHERE id = ?", [user_id]);
+    if (users.length === 0) {
+      return res.status(400).json({ error: "user_id no existe" });
+    }
+  }
+  if (professional_id != null) {
+    const [profs] = await pool.query("SELECT id FROM professional WHERE id = ?", [professional_id]);
+    if (profs.length === 0) {
+      return res.status(400).json({ error: "professional_id no existe" });
+    }
+  }
+
   const [result] = await pool.query(
-    "INSERT INTO turnos (fecha, usuario_id) VALUES (?, ?)",
-    [fecha, usuario_id]
+    "INSERT INTO appointments (scheduled_at, service, notes, user_id, professional_id) VALUES (?, ?, ?, ?, ?)",
+    [scheduled_at, service, notes, user_id, professional_id]
   );
-  res.json({ id: result.insertId, fecha, usuario_id });
+  res.json({ id: result.insertId, scheduled_at, user_id, professional_id});
 });
 
-app.put("/api/turnos/:id", async (req, res) => {
+app.put("/api/appointments/:id", async (req, res) => {
   const { id } = req.params;
-  const { fecha, usuario_id } = req.body;
-  await pool.query("UPDATE turnos SET fecha = ?, usuario_id = ? WHERE id = ?", [
-    fecha,
-    usuario_id,
+  const { scheduled_at, user_id, professional_id, service, status } = req.body;
+  // Validate referenced user and professional exist (if provided)
+  if (user_id != null) {
+    const [users] = await pool.query("SELECT id FROM users WHERE id = ?", [user_id]);
+    if (users.length === 0) {
+      return res.status(400).json({ error: "user_id no existe" });
+    }
+  }
+  if (professional_id != null) {
+    const [profs] = await pool.query("SELECT id FROM professional WHERE id = ?", [professional_id]);
+    if (profs.length === 0) {
+      return res.status(400).json({ error: "professional_id no existe" });
+    }
+  }
+
+  await pool.query("UPDATE appointments SET scheduled_at = ?, user_id = ?, professional_id = ?, service = ?, status = ? WHERE id = ?", [
+    scheduled_at,
+    user_id,
+    professional_id,
+    service,
+    status,
     id
   ]);
-  res.json({ id, fecha, usuario_id });
+  res.json({ id, scheduled_at, user_id, professional_id, service, status });
 });
 
-app.delete("/api/turnos/:id", async (req, res) => {
+app.delete("/api/appointments/:id", async (req, res) => {
   const { id } = req.params;
-  await pool.query("DELETE FROM turnos WHERE id = ?", [id]);
-  res.json({ message: "Turno eliminado" });
+  await pool.query("DELETE FROM appointments WHERE id = ?", [id]);
+  res.json({ message: "Appointment eliminado" });
 });
 
 //Apis externas
@@ -138,7 +276,14 @@ app.get("/api/clima", async (req, res) => {
   }
 });
 
-//Inicio del servidor
-app.listen(3000, () => {
-  console.log("Backend ejecutandose en el puerto 3000");
-});
+// Inicio del servidor: inicializar DB y luego levantar Express
+initDatabase()
+  .then(() => {
+    app.listen(3000, () => {
+      console.log("Backend ejecutandose en el puerto 3000");
+    });
+  })
+  .catch((err) => {
+    console.error('Error inicializando la base de datos:', err);
+    process.exit(1);
+  });

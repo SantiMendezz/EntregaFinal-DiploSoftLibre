@@ -12,12 +12,14 @@ services:
     container_name: laboratorio-backend
     expose:
       - "3000"
+    volumes:
+      - ./init:/init
     environment:
       - DB_HOST=db
       - DB_PORT=3306
-      - DB_USER=usuario
-      - DB_PASSWORD=contra
-      - DB_NAME=laboratorio-db
+      - DB_USER=root
+      - DB_PASSWORD=1234
+      - DB_NAME=laboratorio
     depends_on:
       - db
     networks:
@@ -45,14 +47,14 @@ services:
     image: mariadb:latest
     environment:
       - MARIADB_ROOT_PASSWORD=1234
-      - MARIADB_DATABASE=laboratorio-db
-      - MARIADB_USER=usuario
-      - MARIADB_PASSWORD=contra
+      - MARIADB_DATABASE=laboratorio
+      - MARIADB_USER=root
+      - MARIADB_PASSWORD=1234
     ports:
       - "3306:3306"
     volumes:
       - ./db/data:/var/lib/mysql
-      - ./db/init:/docker-entrypoint-initdb.d  # <-- montar scripts de inicialización
+      - ./init:/docker-entrypoint-initdb.d  # <-- montar scripts de inicialización desde el directorio raíz 'init'
     networks:
       - laboratorio_net
     restart: unless-stopped

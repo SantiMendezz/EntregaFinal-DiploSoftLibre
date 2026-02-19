@@ -1,11 +1,123 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Frontend del Laboratorio</title>
-  </head>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD de Turnos - Laboratorio</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gestión de Turnos</h1>
+        </header>
 
-  <body>
-    <h1>Aplicación del Laboratorio</h1>
-  </body>
+        <main>
+            <!-- Formulario para agregar/editar turnos -->
+            <section class="form-section">
+                <h2>Nuevo Turno</h2>
+                <form id="turnoForm">
+                    <div class="form-group">
+                        <label for="paciente">Paciente:</label>
+                        <input type="text" id="paciente" required placeholder="Nombre del paciente">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fecha">Fecha:</label>
+                        <input type="date" id="fecha" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="hora">Hora:</label>
+                        <input type="time" id="hora" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="especialidad">Especialidad:</label>
+                        <select id="especialidad" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="General">Medicina General</option>
+                            <option value="Cardiologia">Cardiología</option>
+                            <option value="Dermatologia">Dermatología</option>
+                            <option value="Oftalmologia">Oftalmología</option>
+                            <option value="Odontologia">Odontología</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="userSelect">Usuario (opcional):</label>
+                        <select id="userSelect">
+                            <option value="">Seleccionar usuario...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="professionalSelect">Profesional (opcional):</label>
+                        <select id="professionalSelect">
+                            <option value="">Seleccionar profesional...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="estado">Estado:</label>
+                        <select id="estado" required>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Confirmado">Confirmado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Guardar Turno</button>
+                    <button type="reset" class="btn btn-secondary" id="btnLimpiar">Limpiar</button>
+                </form>
+            </section>
+
+            <!-- Sección de búsqueda y filtros -->
+            <section class="search-section">
+                <h2>Filtros</h2>
+                <div class="filter-group">
+                    <input type="text" id="buscar" placeholder="Buscar por paciente...">
+                    <select id="filtroEspecialidad">
+                        <option value="">Todas las especialidades</option>
+                        <option value="General">Medicina General</option>
+                        <option value="Cardiologia">Cardiología</option>
+                        <option value="Dermatologia">Dermatología</option>
+                        <option value="Oftalmologia">Oftalmología</option>
+                        <option value="Odontologia">Odontología</option>
+                    </select>
+                    <select id="filtroEstado">
+                        <option value="">Todos los estados</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Confirmado">Confirmado</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Tabla de turnos -->
+            <section class="table-section">
+                <h2>Turnos Registrados</h2>
+                <table id="turnosTable" class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Paciente</th>
+                            <th>Fecha</th>
+                            <th>Hora</th>
+                            <th>Especialidad</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="turnosBody">
+                        <tr>
+                            <td colspan="7" class="text-center">No hay turnos registrados</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
 </html>
